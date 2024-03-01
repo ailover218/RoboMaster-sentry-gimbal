@@ -1053,6 +1053,10 @@ void Gimbal::set_mode()
         {
             return;
         }
+        else
+        {
+            gimbal_mode = GIMBAL_FREE;
+        }
     }
 
 #if GIMBAL_FRIC_OPEN_PITCH_UP
