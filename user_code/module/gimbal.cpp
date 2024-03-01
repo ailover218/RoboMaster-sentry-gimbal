@@ -1231,8 +1231,9 @@ int Gimbal::int_fabs(int gimbal_swing_time)
     gimbal_swing_time < 0 ? gimbal_swing_time = -gimbal_swing_time : gimbal_swing_time = gimbal_swing_time;
 }
 
+#if LEFT_RIGHT_SWING // 如果希望左右摆头，则置1；如果置0，则云台为旋转寻敌
 /**
- * @brief          云台摆头
+ * @brief          云台左右摆头
  * @param[out]     yaw: yaw轴角度控制，为角度的增量 单位 rad
  * @param[out]     pitch:pitch轴角度控制，为角度的增量 单位 rad
  * @retval         none
@@ -1260,6 +1261,19 @@ void Gimbal::gimbal_swing(fp32 *yaw, fp32 *pitch)
         gimbal_swing_lr = 0;
     }
 }
+#else
+/**
+ * @brief          云台旋转摆头
+ * @param[out]     yaw: yaw轴角度控制，为角度的增量 单位 rad
+ * @param[out]     pitch:pitch轴角度控制，为角度的增量 单位 rad
+ * @retval         none
+ */
+void Gimbal::gimbal_swing(fp32 *yaw, fp32 *pitch)
+{
+    *pitch = GIMBAL_SWING_ADJUST; // 设置pitch特定增量，反映为旋转速度大小
+    *yaw = 0;                     // yaw不变
+}
+#endif
 
 /**
  * @brief          更新自瞄模式PID

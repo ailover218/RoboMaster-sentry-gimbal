@@ -196,8 +196,9 @@ extern "C"
 #define KEY_STOP_GIMBAL if_key_singal_pessed(gimbal_RC, last_gimbal_RC, KEY_PRESSED_STOP_GIMBAL)
 
 /*---------------------云台自瞄摇摆参数--------------------*/
-#define GIMBAL_SWING_MAXTIME 200
-#define GIMBAL_SWING_ADJUST 0.005
+#define GIMBAL_SWING_MAXTIME 200  // 左右摆头摸下摆头幅度限制
+#define GIMBAL_SWING_ADJUST 0.005 // 摆头模式下pitch轴固定增量大小
+#define LEFT_RIGHT_SWING 0        // 开启左右摆头模式则置1，开启旋转寻敌模式则置0
 
 // 云台行为模式
 typedef enum
