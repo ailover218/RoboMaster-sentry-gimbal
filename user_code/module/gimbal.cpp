@@ -1030,10 +1030,10 @@ void Gimbal::gimbal_data_update()
                                                                 gimbal_pitch_motor.offset_ecd);
 #endif
 
-    // 在云台归中时,读取的速度为编码器反馈的
-    if (gimbal_mode == GIMBAL_TO_MID || gimbal_mode == GIMBAL_FREE)
+    // 在云台归中时,读取的速度为编码器反馈的;云台处于自由寻敌模式时，读取的速度为陀螺仪数据
+    if (gimbal_mode == GIMBAL_TO_MID)
         gimbal_pitch_motor.speed = GM6020_MOTOR_RPM_TO_VECTOR * gimbal_pitch_motor.motor_measure->speed_rpm;
-    else
+    else if (gimbal_mode == GIMBAL_FREE)
         gimbal_pitch_motor.speed = gimbal_INT_gyro_point[INS_GYRO_Y_ADDRESS_OFFSET];
 }
 
@@ -1190,9 +1190,9 @@ void Gimbal::set_control()
     {
         // 自由模式控制量计算
         gimbal_free_control(&add_yaw_angle, &add_pitch_angle);
-        // 自由模式下yaw和pitch角度都由编码器控制
-        gimbal_yaw_motor.angle_limit(add_yaw_angle, ENCODE);
-        gimbal_pitch_motor.angle_limit(add_pitch_angle, ENCODE);
+        // 自由模式下yaw和pitch角度都由陀螺仪控制
+        gimbal_yaw_motor.angle_limit(add_yaw_angle, GYRO);
+        gimbal_pitch_motor.angle_limit(add_pitch_angle, GYRO);
     }
 }
 /**
@@ -1241,8 +1241,8 @@ int Gimbal::int_fabs(int gimbal_swing_time)
  */
 void Gimbal::gimbal_swing(fp32 *yaw, fp32 *pitch)
 {
-    static int gimbal_swing_time = 0;   // 云台摆头时间计时
-    static uint8_t gimbal_swing_lr = 1; // 云台摆头方向，1为右摆，-1为左摆
+    static int gimbal_swing_time = 0;   // 云台上下摆头时间计时
+    static uint8_t gimbal_swing_lr = 1; // 云台摆头方向
 
     if (int_fabs(gimbal_swing_time) < GIMBAL_SWING_MAXTIME) // 通过计时的方式控制摆动角度
     {
@@ -1360,9 +1360,9 @@ void Gimbal::solve()
     }
     else if (gimbal_mode == GIMBAL_FREE)
     {
-        // 自由模式下yaw和pitch角度都由编码器控制
-        gimbal_yaw_motor.motor_encode_angle_control();
-        gimbal_pitch_motor.motor_encode_angle_control();
+        // 自由模式下yaw和pitch角度都由陀螺仪控制
+        gimbal_yaw_motor.motor_gyro_angle_control();
+        gimbal_pitch_motor.motor_gyro_angle_control();
     }
 }
 
