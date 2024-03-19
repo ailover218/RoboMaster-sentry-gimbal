@@ -41,6 +41,9 @@
 
 #define SHOOT_CONTROL_TIME 0.002f
 
+// 摩擦轮电流值转pwm值比例
+#define CURRENT2PWM 1
+
 // 射击完成后 子弹弹出去后，判断时间，以防误触发
 #define SHOOT_DONE_KEY_OFF_TIME 15
 // 鼠标左键长按判断

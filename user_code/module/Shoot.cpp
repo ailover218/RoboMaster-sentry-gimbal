@@ -543,11 +543,12 @@ void Shoot::output()
     trigger_motor.current_give = 0;
 #endif
     // 发送电流
+    // TODO
     can_receive.can_cmd_shoot_motor(fric_motor_left.current_give, fric_motor_right.current_give, trigger_motor.current_give, cover_motor.current_give);
 
     // 发送摩擦轮电机数据
-    fric_motor_left.fric_pwm = (uint16_t)(fric_motor_left.current_give);
-    fric_motor_right.fric_pwm = (uint16_t)(fric_motor_right.current_give);
+    fric_motor_left.fric_pwm = (uint16_t)(fric_motor_left.current_give * CURRENT2PWM);
+    fric_motor_right.fric_pwm = (uint16_t)(fric_motor_right.current_give * CURRENT2PWM);
     shoot_fric_left_on(fric_motor_left.fric_pwm);
     shoot_fric_right_on(fric_motor_right.fric_pwm);
 }
