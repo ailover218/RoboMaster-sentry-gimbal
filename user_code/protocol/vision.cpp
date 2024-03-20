@@ -138,8 +138,9 @@ void vision_send_data(uint8_t CmdID)
   VisionSendData.CmdID = CmdID;
   VisionSendData.speed = 3;
   VisionSendData.yaw = imu.INS_angle[0];
-  VisionSendData.pitch = imu.INS_angle[1];
-  VisionSendData.roll = imu.INS_angle[2];
+  VisionSendData.roll = imu.INS_angle[1];
+  VisionSendData.pitch = imu.INS_angle[2];
+
   VisionSendData.END = 0xFF;
 
   memcpy(vision_send_pack, &VisionSendData, VISION_SEND_LEN_PACKED);
