@@ -1,8 +1,10 @@
 #include "Shoot.h"
 
 #include "main.h"
-
-#include "bsp_fric.h"
+extern "C"
+{
+	#include "bsp_fric.h"
+}
 #include "user_lib.h"
 
 #ifdef __cplusplus // 告诉编译器，这部分代码按C语言的格式进行编译，而不是C++的
@@ -16,6 +18,7 @@ extern "C"
 
 #include "Gimbal.h"
 #include "Communicate.h"
+#include "bsp_fric.h"
 
 #define shoot_fric_left_on(pwm) fric_left_on((pwm))   // 左摩擦轮pwm宏定义
 #define shoot_fric_right_on(pwm) fric_right_on((pwm)) // 右摩擦轮pwm宏定义
