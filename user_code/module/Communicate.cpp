@@ -13,6 +13,11 @@
 #include "Can_receive.h"
 #include "vision.h"
 #include "shoot.h"
+extern "C"
+{
+#include "bsp_buzzer.h"
+
+}
 
 Remote_control remote_control;
 
@@ -154,6 +159,7 @@ extern "C"
     //视觉接收中断
     void USART1_IRQHandler(void)
     {
+			  buzzer_on(5,10000);
         static volatile uint8_t res;
         if (USART1->SR & UART_FLAG_IDLE)
         {
