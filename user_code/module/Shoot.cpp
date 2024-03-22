@@ -58,7 +58,7 @@ fp32 shoot_trigger_grade[6] = {0, 5.0f * trigger_speed_to_radio, 10.0f * trigger
 // 拨盘等级 摩擦轮等级
 uint8_t trigger_speed_grade;
 uint8_t fric_speed_grade;
-
+extern bool_t if_identify_target;
 Shoot shoot;
 
 /**
@@ -177,7 +177,7 @@ void Shoot::set_mode()
     else if (shoot_mode == SHOOT_READY)
     {
         // TODO 如果监测到目标，就开启连发模式
-        if (gimbal.vision_target_flag)
+        if (if_identify_target)
         {
             shoot_mode = SHOOT_CONTINUE_BULLET;
         }
@@ -546,7 +546,7 @@ void Shoot::output()
     // TODO
     can_receive.can_cmd_shoot_motor(fric_motor_left.current_give, fric_motor_right.current_give, trigger_motor.current_give, cover_motor.current_give);
 
-    // 发送摩擦轮电机数据
+    // 发送摩擦轮电机数据，pwm控制摩擦轮
     fric_motor_left.fric_pwm = (uint16_t)(fric_motor_left.current_give * CURRENT2PWM);
     fric_motor_right.fric_pwm = (uint16_t)(fric_motor_right.current_give * CURRENT2PWM);
     shoot_fric_left_on(fric_motor_left.fric_pwm);

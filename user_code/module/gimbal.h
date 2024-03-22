@@ -196,7 +196,7 @@ extern "C"
 #define KEY_STOP_GIMBAL if_key_singal_pessed(gimbal_RC, last_gimbal_RC, KEY_PRESSED_STOP_GIMBAL)
 
 /*---------------------云台自瞄摇摆参数--------------------*/
-#define GIMBAL_SWING_MAXTIME 20   // 左右摆头摸下摆头幅度限制
+#define GIMBAL_SWING_MAXTIME 2000 // 左右摆头摸下摆头幅度限制
 #define GIMBAL_SWING_ADJUST 0.005 // 摆头模式下pitch轴固定增量大小
 
 // 云台行为模式
@@ -278,10 +278,9 @@ public:
     void output();                             // 输出电流
 
     /***************************(C) GIMBAL control *******************************/
-    void gimbal_to_mid_control(fp32 *yaw, fp32 *pitch);     // 初始化模式
-    void gimbal_chassis_control(fp32 *yaw, fp32 *pitch);    // 陀螺仪模式
-    void gimbal_free_control(fp32 *yaw, fp32 *pitch);       // 编码器模式
-    void gimbal_motionless_control(fp32 *yaw, fp32 *pitch); // 无输入控制模式
+    void gimbal_to_mid_control(fp32 *yaw, fp32 *pitch);  // 初始化模式
+    void gimbal_chassis_control(fp32 *yaw, fp32 *pitch); // 陀螺仪模式
+    void gimbal_free_control(fp32 *yaw, fp32 *pitch);    // 编码器模式
     /***************************(C) GIMBAL control *******************************/
 
     static fp32 motor_ecd_to_angle_change(uint16_t ecd, uint16_t offset_ecd);

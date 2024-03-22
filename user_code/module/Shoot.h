@@ -26,8 +26,6 @@
 
 #include "Config.h"
 
-#define IF_REMOTE_CONTROL 0 // 是否进行遥控器控制
-
 #define TRIGGER_CCW 1 // 拨盘顺时针
 #define TRIGGER_CW -1 // 拨盘逆时针
 
