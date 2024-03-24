@@ -31,6 +31,9 @@
 
 #define SHOOT_TRIGGER_DIRECTION TRIGGER_CW
 
+#define SHOOT_LEFT_CHANNEL 1
+#define SHOOT_RIGHT_CHANNEL 0
+
 // 射击发射开关通道数据
 #define SHOOT_RC_MODE_CHANNEL 1
 
@@ -38,9 +41,6 @@
 #define SHOOT_FRIC_ADD_VALUE 0.1f
 
 #define SHOOT_CONTROL_TIME 0.002f
-
-// 摩擦轮电流值转pwm值比例
-#define CURRENT2PWM 1
 
 // 射击完成后 子弹弹出去后，判断时间，以防误触发
 #define SHOOT_DONE_KEY_OFF_TIME 15
@@ -61,6 +61,8 @@
 #define ECD_RANGE 8191
 
 // 摩擦轮电机rmp 变化成 旋转速度的比例
+#define SHOOT_FRIC_PWM_ADD_VALUE 80.0f
+
 #define FRIC_RPM_TO_SPEED 0.000415809748903494517209f
 
 #define FRIC_REQUIRE_SPEED_RMP 500.0f
@@ -141,6 +143,29 @@
 #define TRIGGER 2
 #define COVER 3
 
+typedef struct
+{
+  uint8_t mode;
+  // PID 三参数
+  fp32 Kp;
+  fp32 Ki;
+  fp32 Kd;
+
+  fp32 max_out;  // 最大输出
+  fp32 max_iout; // 最大积分输出
+
+  fp32 set;
+  fp32 fdb;
+
+  fp32 out;
+  fp32 Pout;
+  fp32 Iout;
+  fp32 Dout;
+  fp32 Dbuf[3];  // 微分项 0最新 1上一次 2上上次
+  fp32 error[3]; // 误差项 0最新 1上一次 2上上次
+
+} pid_type_def;
+
 typedef enum
 {
   SHOOT_STOP = 0,        // 停止发射结构
@@ -159,6 +184,43 @@ typedef enum
   COVER_OPEN_DONE,  // 弹仓电机开启完毕
   COVER_CLOSE_DONE, // 弹仓电机关闭完毕
 } cover_mode_e;
+
+typedef struct
+{
+  shoot_mode_e shoot_mode;
+  const RC_ctrl_t *shoot_rc;
+  const motor_measure_t *shoot_motor_measure;
+  ramp_function_source_t fric1_ramp;
+  uint16_t fric_pwm1;
+  ramp_function_source_t fric2_ramp;
+  uint16_t fric_pwm2;
+  pid_type_def trigger_motor_pid;
+  fp32 trigger_speed_set;
+  fp32 speed;
+  fp32 speed_set;
+  fp32 angle;
+  fp32 set_angle;
+  int16_t given_current;
+  int8_t ecd_count;
+
+  bool_t press_l;
+  bool_t press_r;
+  bool_t last_press_l;
+  bool_t last_press_r;
+  uint16_t press_l_time;
+  uint16_t press_r_time;
+  uint16_t rc_s_time;
+
+  uint16_t block_time;
+  uint16_t reverse_time;
+  bool_t move_flag;
+
+  bool_t key;
+  uint8_t key_time;
+
+  uint16_t heat_limit;
+  uint16_t heat;
+} shoot_control_t;
 
 class Shoot
 {
@@ -232,5 +294,6 @@ bool_t shoot_cmd_to_gimbal_stop();
 bool_t shoot_open_fric_cmd_to_gimbal_up();
 
 extern Shoot shoot;
+extern shoot_control_t shoot_control;
 
 #endif

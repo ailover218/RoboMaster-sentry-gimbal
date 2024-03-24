@@ -3,7 +3,7 @@
 #include "main.h"
 extern "C"
 {
-	#include "bsp_fric.h"
+#include "bsp_fric.h"
 }
 #include "user_lib.h"
 
@@ -11,18 +11,17 @@ extern "C"
 extern "C"
 {
 #include "bsp_laser.h"
+#include "bsp_fric.h"
 }
 #endif
 
 #include "detect_task.h"
-
-#include "Gimbal.h"
+#include "gimbal.h"
 #include "Communicate.h"
-#include "bsp_fric.h"
 
-#define shoot_fric_left_on(pwm) fric_left_on((pwm))   // 左摩擦轮pwm宏定义
-#define shoot_fric_right_on(pwm) fric_right_on((pwm)) // 右摩擦轮pwm宏定义
-#define shoot_fric_off() fric_off()                   // 关闭两个摩擦轮
+#define shoot_fric1_on(pwm) fric_left_on((pwm))  // 左摩擦轮pwm宏定义
+#define shoot_fric2_on(pwm) fric_right_on((pwm)) // 右摩擦轮pwm宏定义
+#define shoot_fric_off() fric_off()              // 关闭两个摩擦轮
 
 #define shoot_laser_on() laser_on()   // 激光开启宏定义
 #define shoot_laser_off() laser_off() // 激光关闭宏定义
@@ -47,13 +46,7 @@ shoot热量上限 100 200 300 350 500
 shoot热量冷却 20 40 60 80 100 120
 一发shoot 100热量
 */
-fp32 fric_refree_para = 0.06f; // 摩擦轮系数
-
 fp32 trigger_speed_to_radio = 0.7f; // 拨盘系数
-
-// 通过读取裁判数据,直接修改射速和射频等级
-// 射速等级  摩擦电机
-fp32 shoot_fric_grade[4] = {0, 14.6 * fric_refree_para, 16 * fric_refree_para, 23.5 * fric_refree_para};
 
 // 射频等级 拨弹电机
 fp32 shoot_trigger_grade[6] = {0, 5.0f * trigger_speed_to_radio, 10.0f * trigger_speed_to_radio, 15.0f * trigger_speed_to_radio, 28.0f * trigger_speed_to_radio, 40.0f * trigger_speed_to_radio};
@@ -63,6 +56,7 @@ uint8_t trigger_speed_grade;
 uint8_t fric_speed_grade;
 extern bool_t if_identify_target;
 Shoot shoot;
+shoot_control_t shoot_control;
 
 /**
  * @brief          射击初始化，初始化PID
@@ -71,35 +65,18 @@ Shoot shoot;
  */
 void Shoot::init()
 {
+    shoot_rc = remote_control.get_remote_control_point();
+    last_shoot_rc = remote_control.get_last_remote_control_point();
+    // 初始化上一次的遥控器按键值
+    shoot_last_key_v = shoot_rc->key.v;
     // 设置初试模式
     shoot_mode = SHOOT_STOP;
 
     cover_mode = COVER_CLOSE;
 
     // 摩擦轮电机
-    // 获取电机数据
-    fric_motor_left.init(can_receive.get_shoot_motor_measure_point(LEFT_FRIC));
-    // 初始化PID
-    fp32 fric_left_speed_pid_parm[5] = {FRIC_left_SPEED_PID_KP, FRIC_left_SPEED_PID_KI, FRIC_left_SPEED_PID_KD, FRIC_left_PID_MAX_IOUT, FRIC_left_PID_MAX_OUT};
-    fric_motor_left.speed_pid.init(PID_SPEED, fric_left_speed_pid_parm, &fric_motor_left.speed, &fric_motor_left.speed_set, NULL);
-    fric_motor_left.speed_pid.pid_clear();
-
-    // 设置最大 最小值  左摩擦轮顺时针转 右摩擦轮逆时针转
-    fric_motor_left.max_speed = FRIC_MAX_SPEED;
-    fric_motor_left.min_speed = -FRIC_MAX_SPEED;
-    fric_motor_left.require_speed = -FRIC_MAX_REQUIRE_SPEED;
-
-    // 获取电机数据
-    fric_motor_right.init(can_receive.get_shoot_motor_measure_point(RIGHT_FRIC));
-    // 初始化PID
-    fp32 fric_right_speed_pid_parm[5] = {FRIC_right_SPEED_PID_KP, FRIC_right_SPEED_PID_KI, FRIC_right_SPEED_PID_KD, FRIC_right_PID_MAX_IOUT, FRIC_right_PID_MAX_OUT};
-    fric_motor_right.speed_pid.init(PID_SPEED, fric_right_speed_pid_parm, &fric_motor_right.speed, &fric_motor_right.speed_set, NULL);
-    fric_motor_right.speed_pid.pid_clear();
-
-    // 设置最大 最小值  左摩擦轮顺时针转 右摩擦轮逆时针转
-    fric_motor_right.max_speed = FRIC_MAX_SPEED;
-    fric_motor_right.min_speed = -FRIC_MAX_SPEED;
-    fric_motor_right.require_speed = -FRIC_MAX_REQUIRE_SPEED;
+    ramp_init(&shoot_control.fric1_ramp, SHOOT_CONTROL_TIME * 0.001f, FRIC_DOWN, FRIC_OFF);
+    ramp_init(&shoot_control.fric2_ramp, SHOOT_CONTROL_TIME * 0.001f, FRIC_DOWN, FRIC_OFF);
 
     trigger_motor.init(can_receive.get_shoot_motor_measure_point(TRIGGER));
     // 初始化PID
@@ -144,9 +121,6 @@ void Shoot::init()
     shoot_cmd_slow_fric_left.init(SHOOT_CONTROL_TIME, chassis_x_order_filter);
     shoot_cmd_slow_fric_right.init(SHOOT_CONTROL_TIME, chassis_y_order_filter);
 
-    // 预先开启摩擦轮
-    shoot_mode = SHOOT_READY_FRIC;
-
     // 更新数据
     feedback_update();
 
@@ -170,9 +144,20 @@ uint8_t temp_c;
 static uint16_t last_cover_key_value = 0;
 void Shoot::set_mode()
 {
+    shoot_rc = remote_control.get_remote_control_point();
+
+    // 预先开启摩擦轮
+    if (switch_is_up(shoot_rc->rc.s[SHOOT_LEFT_CHANNEL]))
+    {
+        shoot_mode = SHOOT_READY_FRIC;
+    }
+    else
+    {
+        shoot_mode = SHOOT_DONE;
+    }
     // 摩擦轮速度达到一定值,才可开启拨盘  为了便于测试,这里至少需要一个摩擦轮电机达到拨盘启动要求就可以开启拨盘
     // if (shoot_mode == SHOOT_READY_FRIC && (abs_int16(fric_motor[LEFT_FRIC].motor_measure->speed_rpm) > abs_fp32(fric_motor[LEFT_FRIC].require_speed) || abs_int16(fric_motor[RIGHT_FRIC].motor_measure->speed_rpm) > abs_fp32(fric_motor[RIGHT_FRIC].require_speed)))
-    if (shoot_mode == SHOOT_READY_FRIC && (abs_int16(fric_motor_left.motor_measure->speed_rpm) > abs_fp32(fric_motor_left.require_speed) || abs_int16(fric_motor_right.motor_measure->speed_rpm) > abs_fp32(fric_motor_right.require_speed)))
+    if (shoot_mode == SHOOT_READY_FRIC && shoot_control.fric_pwm1 >= FRIC_DOWN && shoot_control.fric_pwm2 >=FRIC_DOWN)
     {
         fric_status = TRUE;
         shoot_mode = SHOOT_READY;
@@ -185,33 +170,23 @@ void Shoot::set_mode()
             shoot_mode = SHOOT_CONTINUE_BULLET;
         }
     }
-    else if (shoot_mode == SHOOT_DONE)
-    {
-        if (key == SWITCH_TRIGGER_OFF)
-        {
-            key_time++;
-            if (key_time > SHOOT_DONE_KEY_OFF_TIME)
-            {
-                key_time = 0;
-                shoot_mode = SHOOT_READY_BULLET;
-            }
-        }
-        else
-        {
-            key_time = 0;
-            shoot_mode = SHOOT_BULLET;
-        }
-    }
-
-    // //检测两个摩擦轮同时上线，为了便于调试，暂时注释
-    // if(!toe_is_error(REFEREE_TOE) && (heat + SHOOT_HEAT_REMAIN_VALUE > heat_limit))
-    // {
-    //     if(shoot_mode == SHOOT_BULLET || shoot_mode == SHOOT_CONTINUE_BULLET)
-    //     {
-    //         shoot_mode =SHOOT_READY_BULLET;
-    //     }
-    // }
-
+    //    else if (shoot_mode == SHOOT_DONE)
+    //    {
+    //        if (key == SWITCH_TRIGGER_OFF)
+    //        {
+    //            key_time++;
+    //            if (key_time > SHOOT_DONE_KEY_OFF_TIME)
+    //            {
+    //                key_time = 0;
+    //                shoot_mode = SHOOT_READY_BULLET;
+    //            }
+    //        }
+    //        else
+    //        {
+    //            key_time = 0;
+    //            shoot_mode = SHOOT_BULLET;
+    //        }
+    //    }
     // //如果云台状态是 无力状态，就关闭射击
     if (gimbal_cmd_to_shoot_stop())
     {
@@ -227,8 +202,40 @@ void Shoot::set_mode()
 void Shoot::feedback_update()
 {
     // 更新摩擦轮电机速度
-    fric_motor_left.speed = -fric_motor_left.motor_measure->speed_rpm * FRIC_RPM_TO_SPEED;
-    fric_motor_right.speed = fric_motor_right.motor_measure->speed_rpm * FRIC_RPM_TO_SPEED;
+    static fp32 speed_fliter_1 = 0.0f;
+    static fp32 speed_fliter_2 = 0.0f;
+    static fp32 speed_fliter_3 = 0.0f;
+
+    //拨弹轮电机速度滤波一下
+    static const fp32 fliter_num[3] = {1.725709860247969f, -0.75594777109163436f, 0.030237910843665373f};
+
+    //二阶低通滤波
+    speed_fliter_1 = speed_fliter_2;
+    speed_fliter_2 = speed_fliter_3;
+    speed_fliter_3 = speed_fliter_2 * fliter_num[0] + speed_fliter_1 * fliter_num[1] + (shoot_control.shoot_motor_measure->speed_rpm * MOTOR_RPM_TO_SPEED) * fliter_num[2];
+    shoot_control.speed = speed_fliter_3;
+
+    //电机圈数重置， 因为输出轴旋转一圈， 电机轴旋转 36圈，将电机轴数据处理成输出轴数据，用于控制输出轴角度
+    if (shoot_control.shoot_motor_measure->ecd - shoot_control.shoot_motor_measure->last_ecd > HALF_ECD_RANGE)
+    {
+        shoot_control.ecd_count--;
+    }
+    else if (shoot_control.shoot_motor_measure->ecd - shoot_control.shoot_motor_measure->last_ecd < -HALF_ECD_RANGE)
+    {
+        shoot_control.ecd_count++;
+    }
+
+    if (shoot_control.ecd_count == FULL_COUNT)
+    {
+        shoot_control.ecd_count = -(FULL_COUNT - 1);
+    }
+    else if (shoot_control.ecd_count == -FULL_COUNT)
+    {
+        shoot_control.ecd_count = FULL_COUNT - 1;
+    }
+
+    //计算输出轴角度
+    shoot_control.angle = (shoot_control.ecd_count * ECD_RANGE + shoot_control.shoot_motor_measure->ecd) * MOTOR_ECD_TO_ANGLE;
 
     // 拨弹轮电机速度滤波一下
     static fp32 trigger_speed_fliter_1 = 0.0f;
@@ -307,11 +314,19 @@ void Shoot::set_control()
 {
     if (shoot_mode == SHOOT_STOP)
     {
+		// 设置摩擦轮数据
+		shoot_control.fric_pwm1 = 0;
+		shoot_control.fric_pwm2 = 0;
+		
         // 设置拨弹轮的速度
         trigger_motor.speed_set = 0.0f;
     }
     else if (shoot_mode == SHOOT_READY_FRIC)
     {
+		// 设置拨摩擦轮的速度
+		shoot_control.fric_pwm1 = (uint16_t)(shoot_control.fric1_ramp.out);
+		shoot_control.fric_pwm2 = (uint16_t)(shoot_control.fric2_ramp.out);
+		
         // 设置拨弹轮的速度
         trigger_motor.speed_set = 0.0f;
     }
@@ -347,6 +362,11 @@ void Shoot::set_control()
     }
     else if (shoot_mode == SHOOT_DONE)
     {
+		// 设置摩擦轮数据
+		shoot_control.fric_pwm1 = 0;
+		shoot_control.fric_pwm2 = 0;
+		
+		// 设置拨弹轮的速度
         trigger_motor.speed_set = 0.0f;
     }
 
@@ -426,15 +446,7 @@ void Shoot::cooling_ctrl()
             trigger_speed_grade = 4;
         else if (shoot_cooling_limit <= 400)
             trigger_speed_grade = 5;
-
-        // 射速
-        if (shoot_speed_limit <= 15)
-            fric_speed_grade = 1;
-        else if (shoot_speed_limit <= 18)
-            fric_speed_grade = 2;
-        else if (shoot_speed_limit <= 30)
-            fric_speed_grade = 3;
-
+		
         // 根据当前热量和射速修改等级,确保不会因超限扣血,
         // 热量 当剩余热量低于30,强制制动
         if (shoot_cooling_limit - shoot_cooling_heat <= 30 && trigger_speed_grade != 0)
@@ -457,16 +469,6 @@ void Shoot::cooling_ctrl()
     // 连发模式下，对拨盘电机输入控制值
     if (shoot_mode == SHOOT_CONTINUE_BULLET)
         trigger_motor.speed_set = shoot_trigger_grade[trigger_speed_grade] * SHOOT_TRIGGER_DIRECTION;
-    // 对摩擦轮电机输入控制值
-    fric_motor_left.speed_set = shoot_fric_grade[fric_speed_grade];
-    fric_motor_right.speed_set = shoot_fric_grade[fric_speed_grade];
-
-    // 一阶低通滤波作为摩擦轮输入
-    shoot_cmd_slow_fric_left.first_order_filter_cali(fric_motor_left.speed_set);
-    shoot_cmd_slow_fric_right.first_order_filter_cali(fric_motor_right.speed_set);
-
-    fric_motor_left.speed_set = shoot_cmd_slow_fric_left.out;
-    fric_motor_right.speed_set = shoot_cmd_slow_fric_right.out;
 }
 
 /**
@@ -483,8 +485,8 @@ void Shoot::solve()
         fric_status = FALSE;
 
         trigger_motor.speed_set = 0;
-        fric_motor_left.speed_set = 0;
-        fric_motor_right.speed_set = 0;
+        //        fric_motor_left.speed_set = 0;
+        //        fric_motor_right.speed_set = 0;
     }
     else
     {
@@ -507,19 +509,6 @@ void Shoot::solve()
         }
     }
 
-    if (fric_motor_left.speed_set > fric_motor_left.max_speed)
-        fric_motor_left.speed_set = fric_motor_left.max_speed;
-    else if (fric_motor_left.speed_set < fric_motor_left.min_speed)
-        fric_motor_left.speed_set = fric_motor_left.min_speed;
-
-    if (fric_motor_right.speed_set > fric_motor_right.max_speed)
-        fric_motor_right.speed_set = fric_motor_right.max_speed;
-    else if (fric_motor_right.speed_set < fric_motor_right.min_speed)
-        fric_motor_right.speed_set = fric_motor_right.min_speed;
-
-    // 计算PID
-    fric_motor_left.current_set = fric_motor_left.speed_pid.pid_calc();
-    fric_motor_right.current_set = fric_motor_right.speed_pid.pid_calc();
     trigger_motor.current_set = trigger_motor.speed_pid.pid_calc();
 
     cover_motor.current_set = cover_motor.speed_pid.pid_calc();
@@ -527,18 +516,8 @@ void Shoot::solve()
 
 void Shoot::output()
 {
-    fric_motor_left.current_give = -(int16_t)(fric_motor_left.current_set);
-    fric_motor_right.current_give = (int16_t)(fric_motor_right.current_set);
     trigger_motor.current_give = trigger_motor.current_set;
     cover_motor.current_give = cover_motor.current_set;
-
-// 电流输出控制,通过调整宏定义控制
-#if SHOOT_FRIC_MOTOR_HAVE_CURRENT
-    ;
-#else
-    fric_motor[LEFT_FRIC].current_give = 0;
-    fric_motor[RIGHT_FRIC].current_give = 0;
-#endif
 
 #if SHOOT_TRIGGER_MOTOR_HAVE_CURRENT
     ;
@@ -549,11 +528,14 @@ void Shoot::output()
     // TODO
     can_receive.can_cmd_shoot_motor(fric_motor_left.current_give, fric_motor_right.current_give, trigger_motor.current_give, cover_motor.current_give);
 
-    // 发送摩擦轮电机数据，pwm控制摩擦轮
-    fric_motor_left.fric_pwm = (uint16_t)(fric_motor_left.current_give * CURRENT2PWM);
-    fric_motor_right.fric_pwm = (uint16_t)(fric_motor_right.current_give * CURRENT2PWM);
-    shoot_fric_left_on(fric_motor_left.fric_pwm);
-    shoot_fric_right_on(fric_motor_right.fric_pwm);
+    ramp_calc(&shoot_control.fric1_ramp, SHOOT_FRIC_PWM_ADD_VALUE);
+    ramp_calc(&shoot_control.fric2_ramp, SHOOT_FRIC_PWM_ADD_VALUE);
+	
+	// 输出摩擦轮数据
+	ramp_calc(&shoot_control.fric1_ramp, SHOOT_FRIC_PWM_ADD_VALUE);
+    ramp_calc(&shoot_control.fric2_ramp, SHOOT_FRIC_PWM_ADD_VALUE);
+	shoot_fric1_on(shoot_control.fric_pwm1);
+	shoot_fric2_on(shoot_control.fric_pwm2);
 }
 
 /**

@@ -170,7 +170,7 @@ void Gimbal::set_mode()
         return;
 
     // 归中模式
-    if (gimbal_mode == GIMBAL_TO_MID)
+    if (gimbal_mode == GIMBAL_TO_MID && switch_is_up(gimbal_RC->rc.s[GIMBAL_RIGHT_CHANNEL]))
     {
         if (!gimbal_to_mid())
         {
@@ -306,7 +306,8 @@ void Gimbal::set_control()
         gimbal_pitch_motor.angle_limit(add_pitch_angle, ENCODE);
 
         // 完成归中模式后，云台模式自动改为自由控制模式，并开启寻找敌方机器人
-        gimbal_mode == GIMBAL_FREE;
+//        gimbal_mode == GIMBAL_FREE;
+		// TODO
     }
     else if (gimbal_mode == GIMBAL_FREE)
     {
@@ -345,17 +346,6 @@ void Gimbal::gimbal_to_mid_control(fp32 *yaw, fp32 *pitch)
 }
 
 /**
- * @brief          对int型数据做绝对值
- * @param[out]
- * @retval         none
- */
-int Gimbal::int_fabs(int gimbal_swing_time)
-{
-    gimbal_swing_time < 0 ? gimbal_swing_time = -gimbal_swing_time : gimbal_swing_time = gimbal_swing_time;
-    return gimbal_swing_time;
-}
-
-/**
  * @brief          云台旋转摆头
  * @param[out]     yaw: yaw轴角度控制，为角度的增量 单位 rad
  * @param[out]     pitch:pitch轴角度控制，为角度的增量 单位 rad
@@ -363,27 +353,6 @@ int Gimbal::int_fabs(int gimbal_swing_time)
  */
 void Gimbal::gimbal_swing(fp32 *yaw, fp32 *pitch)
 {
-    // TODO
-    static int gimbal_swing_time = 0;   // 云台上下摆头时间计时
-    static uint8_t gimbal_swing_lr = 1; // 云台摆头方向
-
-    if (int_fabs(gimbal_swing_time) < GIMBAL_SWING_MAXTIME) // 通过计时的方式控制摆动角度
-    {
-        *pitch = gimbal_swing_lr * GIMBAL_SWING_ADJUST; // 改变pitch值
-
-        gimbal_swing_lr == 1 ? gimbal_swing_time++ : gimbal_swing_time--; // 判断摆头方向
-    }
-    else if (int_fabs(gimbal_swing_time) == GIMBAL_SWING_MAXTIME)
-    {
-        gimbal_swing_lr == 1 ? gimbal_swing_lr = -1 : gimbal_swing_lr = 1; // 改变摆头方向
-        gimbal_swing_time > 0 ? gimbal_swing_time-- : gimbal_swing_time++;
-    }
-    else
-    {
-        gimbal_swing_time = 0;
-        gimbal_swing_lr = 0;
-    }
-
     *yaw = GIMBAL_SWING_ADJUST; // 设置yaw特定增量，反映为旋转速度大小
 }
 
@@ -507,8 +476,8 @@ void Gimbal::output()
     gimbal_pitch_motor.current_give = 0;
 #endif
 
-    can_receive.can_cmd_yaw_motor(gimbal_yaw_motor.current_give);
-    can_receive.can_cmd_pitch_motor(gimbal_pitch_motor.current_give);
+    // can_receive.can_cmd_yaw_motor(gimbal_yaw_motor.current_give);
+    // can_receive.can_cmd_pitch_motor(gimbal_pitch_motor.current_give);
 }
 /*****************************(C) CALI GIMBAL *******************************/
 /**
@@ -727,7 +696,7 @@ bool_t Gimbal::cmd_cali_gimbal_hook(uint16_t *yaw_offset, uint16_t *pitch_offset
 
 bool_t gimbal_cmd_to_shoot_stop(void)
 {
-    if (gimbal.gimbal_mode == GIMBAL_TO_MID || gimbal.gimbal_mode == GIMBAL_CALI || gimbal.gimbal_mode == GIMBAL_ZERO_FORCE)
+    if (gimbal.gimbal_mode == GIMBAL_CALI || gimbal.gimbal_mode == GIMBAL_ZERO_FORCE)
     {
         return 1;
     }

@@ -101,6 +101,9 @@ extern "C"
 
 // 遥控器输入死区，因为遥控器存在差异，摇杆在中间，其值不一定为零
 #define RC_DEADBAND 10
+#define GIMBAL_LEFT_CHANNEL 1  // 左拨杆
+#define GIMBAL_RIGHT_CHANNEL 0 // 右拨杆
+
 // 云台 遥控器速度
 #define YAW_RC_SEN -0.00002f // 右手系 z轴逆时针为正 但是遥控器通道向右为正 故加负号
 #define PITCH_RC_SEN 0.000010f
@@ -273,7 +276,6 @@ public:
     void recover_normal_pid();                 // 返回正常PID
     void turn_around_control(fp32 *yaw);       // 掉头控制
     void gimbal_swing(fp32 *yaw, fp32 *pitch); // 云台摆头
-    int int_fabs(int gimbal_swing_time);       // 对int型数据做绝对值
     void solve();                              // 云台控制PID计算
     void output();                             // 输出电流
 
