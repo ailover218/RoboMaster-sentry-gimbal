@@ -50,7 +50,7 @@ shoot热量冷却 20 40 60 80 100 120
 fp32 trigger_speed_to_radio = 0.7f; // 拨盘系数
 
 // 射频等级 拨弹电机
-fp32 shoot_trigger_grade[7] = {0, 5.0f * trigger_speed_to_radio, 10.0f * trigger_speed_to_radio, 15.0f * trigger_speed_to_radio, 20.0f * trigger_speed_to_radio, 25.0f * trigger_speed_to_radio};
+fp32 shoot_trigger_grade[6] = {0, 5.0f * trigger_speed_to_radio, 10.0f * trigger_speed_to_radio, 15.0f * trigger_speed_to_radio, 20.0f * trigger_speed_to_radio, 25.0f * trigger_speed_to_radio};
 
 // 拨盘等级 摩擦轮等级
 uint8_t trigger_speed_grade;
@@ -159,18 +159,18 @@ void Shoot::set_mode()
     // if (shoot_mode == SHOOT_READY_FRIC && (abs_int16(fric_motor[LEFT_FRIC].motor_measure->speed_rpm) > abs_fp32(fric_motor[LEFT_FRIC].require_speed) || abs_int16(fric_motor[RIGHT_FRIC].motor_measure->speed_rpm) > abs_fp32(fric_motor[RIGHT_FRIC].require_speed)))
     if (shoot_mode == SHOOT_READY_FRIC && shoot_control.fric_pwm1 >= FRIC_DOWN && shoot_control.fric_pwm2 >= FRIC_DOWN)
     {
-		if(bullet_begin<=1500)
-			bullet_begin++;
+        if (bullet_begin <= 1500)
+            bullet_begin++;
         fric_status = TRUE;
         shoot_mode = SHOOT_READY;
     }
-    if (shoot_mode == SHOOT_READY && bullet_begin>=1500)
+    if (shoot_mode == SHOOT_READY && bullet_begin >= 1500)
     {
         // TODO 如果监测到目标，就开启连发模式
-        if (if_identify_target)
-        {
-            shoot_mode = SHOOT_CONTINUE_BULLET;
-        }
+        //        if (if_identify_target)
+        //{
+        shoot_mode = SHOOT_CONTINUE_BULLET;
+        //}
     }
     //    else if (shoot_mode == SHOOT_DONE)
     //    {

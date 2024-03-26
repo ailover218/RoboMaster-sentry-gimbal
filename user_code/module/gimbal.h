@@ -31,7 +31,7 @@ extern "C"
 
 /*------------------------速度环pid-----------------------------*/
 // yaw 速度环
-#define YAW_SPEED_PID_KP 8000.0f
+#define YAW_SPEED_PID_KP 3000.0f
 #define YAW_SPEED_PID_KI 0.0f
 #define YAW_SPEED_PID_KD 20.0f
 #define YAW_SPEED_PID_MAX_IOUT 25.0f
@@ -39,17 +39,17 @@ extern "C"
 #define YAW_SPEED_PID_MAX_OUT 20000.0f
 
 // pitch 速度环
-#define PITCH_SPEED_PID_KP 8000.0f // 2900
+#define PITCH_SPEED_PID_KP 2000.0f // 2900
 #define PITCH_SPEED_PID_KI 0.0f
 #define PITCH_SPEED_PID_KD 0.0f
 #define PITCH_SPEED_PID_MAX_IOUT 10.0f
-#define PITCH_SPEED_PID_MAX_OUT 20000.0f // 15000
+#define PITCH_SPEED_PID_MAX_OUT 10000.0f // 15000
 
 /*------------------------------陀螺仪PID------------------------*/
 // yaw轴陀螺仪PID 由陀螺仪角度控制
-#define YAW_GYRO_PID_KP 30.0f
-#define YAW_GYRO_PID_KI 0.1f
-#define YAW_GYRO_PID_KD 12.0f
+#define YAW_GYRO_PID_KP 60.0f
+#define YAW_GYRO_PID_KI 0.01f
+#define YAW_GYRO_PID_KD 1100.0f
 #define YAW_GYRO_PID_MAX_IOUT 0.2f
 #define YAW_GYRO_PID_MAX_OUT 120.0f
 
@@ -132,7 +132,7 @@ extern "C"
 #define PITCH 1
 
 // 电机正反装所对应的
-#define YAW_TURN 1
+#define YAW_TURN 0
 #define PITCH_TURN 0
 
 // 电机码盘值半圈的编码值
@@ -141,8 +141,8 @@ extern "C"
 #define ECD_RANGE 8191
 
 // 云台中值(中值所对应的编码器编码值)
-#define ECD_YAW_MID 0x0A89
-#define ECD_PITCH_MID 2898
+#define ECD_YAW_MID 0x0ACE
+#define ECD_PITCH_MID 0x1553
 
 // 限幅
 #define MAX_GYRO_YAW PI

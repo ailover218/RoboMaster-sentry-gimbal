@@ -323,7 +323,7 @@ void Gimbal::set_control()
         gimbal_chassis_control(&add_yaw_angle, &add_pitch_angle);
         // 底盘跟随模式下yaw使用陀螺仪控制,pitch使用陀螺仪控制
         gimbal_yaw_motor.angle_limit(add_yaw_angle, GYRO);
-        gimbal_pitch_motor.angle_limit(add_pitch_angle, GYRO);
+        gimbal_pitch_motor.angle_limit(add_pitch_angle, ENCODE);
     }
 }
 /**
@@ -411,7 +411,7 @@ void Gimbal::gimbal_chassis_control(fp32 *yaw, fp32 *pitch)
     // 当识别到目标,开始瞄准
     if (vision_if_find_target())
     {
-        update_auto_pid();              // 更新自瞄pid
+        // update_auto_pid();              // 更新自瞄pid
         vision_error_angle(yaw, pitch); // 获取yaw 和 pitch的偏移量
     }
     else
@@ -452,7 +452,7 @@ void Gimbal::solve()
     {
         // 底盘跟随模式下yaw使用陀螺仪控制,pitch使用陀螺仪控制
         gimbal_yaw_motor.motor_gyro_angle_control();
-        gimbal_pitch_motor.motor_gyro_angle_control();
+        gimbal_pitch_motor.motor_encode_angle_control();
     }
 }
 
