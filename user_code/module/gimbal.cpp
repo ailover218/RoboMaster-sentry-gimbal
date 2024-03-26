@@ -59,7 +59,7 @@ void Gimbal::init()
 
     /*------------------------云台状态机初始化----------------------------*/
     // 初始化初始状态为归中模式
-    gimbal_mode = GIMBAL_TO_MID;
+    gimbal_mode = GIMBAL_ZERO_FORCE;
 
     /*---------------------------yaw电机---------------------------------*/
     // 获取Yaw轴电机数据指针
@@ -155,7 +155,7 @@ void Gimbal::gimbal_data_update()
     // 在云台归中时,读取的速度为编码器反馈的;云台处于自由寻敌模式时，读取的速度为陀螺仪数据
     if (gimbal_mode == GIMBAL_TO_MID)
         gimbal_pitch_motor.speed = GM6020_MOTOR_RPM_TO_VECTOR * gimbal_pitch_motor.motor_measure->speed_rpm;
-    else if (gimbal_mode == GIMBAL_FREE)
+    else
         gimbal_pitch_motor.speed = gimbal_INT_gyro_point[INS_GYRO_Y_ADDRESS_OFFSET];
 }
 
@@ -170,7 +170,7 @@ void Gimbal::set_mode()
         return;
 
     // 归中模式
-    if (gimbal_mode == GIMBAL_TO_MID && switch_is_up(gimbal_RC->rc.s[GIMBAL_RIGHT_CHANNEL]))
+    if (gimbal_mode == GIMBAL_TO_MID)
     {
         if (!gimbal_to_mid())
         {
@@ -178,8 +178,20 @@ void Gimbal::set_mode()
         }
         else
         {
-            gimbal_mode = GIMBAL_FREE;
+            gimbal_mode = GIMBAL_CHASSIS;
         }
+    }
+    if (switch_is_down(gimbal_RC->rc.s[GIMBAL_RIGHT_CHANNEL]))
+    {
+        gimbal_mode = GIMBAL_ZERO_FORCE;
+    }
+    else if (switch_is_mid(gimbal_RC->rc.s[GIMBAL_RIGHT_CHANNEL]))
+    {
+        gimbal_mode = GIMBAL_TO_MID;
+    }
+    else if (switch_is_up(gimbal_RC->rc.s[GIMBAL_RIGHT_CHANNEL]))
+    {
+        gimbal_mode = GIMBAL_CHASSIS;
     }
 
 #if GIMBAL_FRIC_OPEN_PITCH_UP
@@ -304,16 +316,12 @@ void Gimbal::set_control()
         // 归中模式下yaw和pitch角度都由编码器控制
         gimbal_yaw_motor.angle_limit(add_yaw_angle, ENCODE);
         gimbal_pitch_motor.angle_limit(add_pitch_angle, ENCODE);
-
-        // 完成归中模式后，云台模式自动改为自由控制模式，并开启寻找敌方机器人
-//        gimbal_mode == GIMBAL_FREE;
-		// TODO
     }
-    else if (gimbal_mode == GIMBAL_FREE)
+    else if (gimbal_mode == GIMBAL_CHASSIS)
     {
-        // 自由模式控制量计算
-        gimbal_free_control(&add_yaw_angle, &add_pitch_angle);
-        // 自由模式下yaw和pitch角度都由陀螺仪控制
+        // 底盘跟随模式控制量计算
+        gimbal_chassis_control(&add_yaw_angle, &add_pitch_angle);
+        // 底盘跟随模式下yaw使用陀螺仪控制,pitch使用陀螺仪控制
         gimbal_yaw_motor.angle_limit(add_yaw_angle, GYRO);
         gimbal_pitch_motor.angle_limit(add_pitch_angle, GYRO);
     }
@@ -389,7 +397,7 @@ void Gimbal::recover_normal_pid()
  * @param[in]      pitch: pitch轴角度控制，为角度的增量 单位 rad
  * @retval         none
  */
-void Gimbal::gimbal_free_control(fp32 *yaw, fp32 *pitch)
+void Gimbal::gimbal_chassis_control(fp32 *yaw, fp32 *pitch)
 {
     if (yaw == NULL || pitch == NULL)
     {
@@ -401,19 +409,26 @@ void Gimbal::gimbal_free_control(fp32 *yaw, fp32 *pitch)
     auto_switch = TRUE;
 #endif
     // 当识别到目标,开始瞄准
-    if (vision_if_find_target() == TRUE)
+    if (vision_if_find_target())
     {
-        // TODO 修改底盘模式
-        if_identify_target = true;
         update_auto_pid();              // 更新自瞄pid
         vision_error_angle(yaw, pitch); // 获取yaw 和 pitch的偏移量
     }
     else
     {
-        if_identify_target = false;
-        recover_normal_pid(); // 返回原来的pid
+        // TODO:
+        // recover_normal_pid(); // 返回原来的pid
+        static int16_t yaw_channel = 0, pitch_channel = 0;
+
+        // 使用遥控器控制
+        rc_deadband_limit(gimbal_RC->rc.ch[YAW_CHANNEL], yaw_channel, RC_DEADBAND);
+        rc_deadband_limit(gimbal_RC->rc.ch[PITCH_CHANNEL], pitch_channel, RC_DEADBAND);
+
+        *yaw = yaw_channel * YAW_RC_SEN + gimbal_RC->mouse.x * YAW_MOUSE_SEN;
+        *pitch = pitch_channel * PITCH_RC_SEN + gimbal_RC->mouse.y * PITCH_MOUSE_SEN;
+
         // TODO 云台开始摆头寻找目标
-        gimbal_swing(yaw, pitch);
+        // gimbal_swing(yaw, pitch);
     }
 }
 
@@ -433,9 +448,9 @@ void Gimbal::solve()
         gimbal_yaw_motor.motor_encode_angle_control();
         gimbal_pitch_motor.motor_encode_angle_control();
     }
-    else if (gimbal_mode == GIMBAL_FREE)
+    else if (gimbal_mode == GIMBAL_CHASSIS)
     {
-        // 自由模式下yaw和pitch角度都由陀螺仪控制
+        // 底盘跟随模式下yaw使用陀螺仪控制,pitch使用陀螺仪控制
         gimbal_yaw_motor.motor_gyro_angle_control();
         gimbal_pitch_motor.motor_gyro_angle_control();
     }
@@ -476,8 +491,8 @@ void Gimbal::output()
     gimbal_pitch_motor.current_give = 0;
 #endif
 
-    // can_receive.can_cmd_yaw_motor(gimbal_yaw_motor.current_give);
-    // can_receive.can_cmd_pitch_motor(gimbal_pitch_motor.current_give);
+    can_receive.can_cmd_yaw_motor(gimbal_yaw_motor.current_give);
+    can_receive.can_cmd_pitch_motor(gimbal_pitch_motor.current_give);
 }
 /*****************************(C) CALI GIMBAL *******************************/
 /**

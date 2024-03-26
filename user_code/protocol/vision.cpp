@@ -37,7 +37,7 @@ uint8_t Attack_Color_Choose = ATTACK_NONE; // 默认不识别
 uint8_t Vision_Armor = FALSE;
 
 // 是否识别到装甲板
-bool_t if_identify_target = FALSE;
+bool_t if_identify_target = 0;
 
 // 角度补偿,发送给视觉
 float Vision_Comps_Yaw_Send = COMPENSATION_YAW;
